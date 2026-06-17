@@ -11,6 +11,7 @@
 		header?: Snippet<[{ header: string; column: ColumnDef<T> }]>;
 		idKey: keyof T;
 		hasFooter?: boolean;
+		onRowClick?: (row: T, event: MouseEvent | KeyboardEvent) => void;
 	};
 
 	let {
@@ -19,8 +20,21 @@
 		minRowHeight,
 		header: customHeader,
 		idKey,
-		hasFooter = false
+		hasFooter = false,
+		onRowClick
 	}: Props = $props();
+
+	let wrapper: HTMLElement;
+
+	/**
+	 * Scroll the row with the given id (matched against `row[idKey]`) into view.
+	 * Call via a component reference, e.g. `raster.scrollToRow(id)`.
+	 */
+	export function scrollToRow(id: T[keyof T], options: ScrollIntoViewOptions = { block: 'nearest' }) {
+		const row = wrapper?.querySelector(`[data-row-id="${CSS.escape(String(id))}"]`);
+		row?.scrollIntoView(options);
+		return !!row;
+	}
 
 	const DEFAULT_WIDTH = 150;
 	const resizeHandle = (column: ColumnDef<T>) => {
@@ -109,7 +123,7 @@
 	{value.cur}
 {/snippet}
 
-<div class="datagrid-wrapper">
+<div class="datagrid-wrapper" bind:this={wrapper}>
 	<div class="datagrid-row datagrid-header">
 		{#each columns as column (column)}
 			<div class="datagrid-cell" style={`width: ${column.width ?? DEFAULT_WIDTH}px`}>
@@ -134,7 +148,22 @@
 	</div>
 	<div class="datagrid-body">
 		{#each rows as row (row[idKey])}
-			<div class="datagrid-row">
+			<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+			<div
+				class={['datagrid-row', { clickable: onRowClick }]}
+				data-row-id={row[idKey]}
+				role={onRowClick ? 'button' : undefined}
+				tabindex={onRowClick ? 0 : undefined}
+				onclick={onRowClick ? (event) => onRowClick(row, event) : undefined}
+				onkeydown={onRowClick
+					? (event) => {
+							if (event.key === 'Enter' || event.key === ' ') {
+								event.preventDefault();
+								onRowClick(row, event);
+							}
+						}
+					: undefined}
+			>
 				{#each columns as column (column)}
 					<div
 						class="datagrid-cell"
@@ -247,6 +276,10 @@
 		display: flex;
 		width: max-content;
 		min-width: 100%;
+	}
+
+	.datagrid-row.clickable {
+		cursor: pointer;
 	}
 
 	.datagrid-footer {
