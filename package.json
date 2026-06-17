@@ -1,56 +1,56 @@
 {
-	"name": "svelte-raster",
-	"version": "0.1.0",
-	"description": "A lightweight, resizable data-grid (raster) component for Svelte 5.",
-	"license": "MIT",
-	"type": "module",
-	"keywords": [
-		"svelte",
-		"svelte5",
-		"datagrid",
-		"data-grid",
-		"table",
-		"raster",
-		"component"
-	],
-	"repository": {
-		"type": "git",
-		"url": "git+https://github.com/christophsanz/raster.git"
-	},
-	"homepage": "https://github.com/christophsanz/raster#readme",
-	"bugs": {
-		"url": "https://github.com/christophsanz/raster/issues"
-	},
-	"files": [
-		"dist",
-		"!dist/**/*.test.*",
-		"!dist/**/*.spec.*"
-	],
-	"svelte": "./dist/index.js",
-	"types": "./dist/index.d.ts",
-	"exports": {
-		".": {
-			"types": "./dist/index.d.ts",
-			"svelte": "./dist/index.js"
-		}
-	},
-	"sideEffects": [
-		"**/*.css"
-	],
-	"scripts": {
-		"package": "svelte-package && publint",
-		"prepublishOnly": "bun run package",
-		"check": "svelte-check --tsconfig ./tsconfig.json"
-	},
-	"peerDependencies": {
-		"svelte": "^5.0.0"
-	},
-	"devDependencies": {
-		"@sveltejs/package": "^2.5.0",
-		"@sveltejs/vite-plugin-svelte": "^6.2.4",
-		"publint": "^0.3.5",
-		"svelte": "^5.56.3",
-		"svelte-check": "^4.6.0",
-		"typescript": "^5.9.3"
-	}
+  "name": "svelte-raster",
+  "version": "0.2.0",
+  "description": "A lightweight, resizable data-grid (raster) component for Svelte 5.",
+  "license": "MIT",
+  "type": "module",
+  "keywords": [
+    "svelte",
+    "svelte5",
+    "datagrid",
+    "data-grid",
+    "table",
+    "raster",
+    "component"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/christophsanz/raster.git"
+  },
+  "homepage": "https://github.com/christophsanz/raster#readme",
+  "bugs": {
+    "url": "https://github.com/christophsanz/raster/issues"
+  },
+  "files": [
+    "dist",
+    "!dist/**/*.test.*",
+    "!dist/**/*.spec.*"
+  ],
+  "svelte": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "svelte": "./dist/index.js"
+    }
+  },
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "scripts": {
+    "package": "svelte-package && publint",
+    "prepublishOnly": "bun run package",
+    "check": "svelte-check --tsconfig ./tsconfig.json"
+  },
+  "peerDependencies": {
+    "svelte": "^5.0.0"
+  },
+  "devDependencies": {
+    "@sveltejs/package": "^2.5.0",
+    "@sveltejs/vite-plugin-svelte": "^6.2.4",
+    "publint": "^0.3.5",
+    "svelte": "^5.56.3",
+    "svelte-check": "^4.6.0",
+    "typescript": "^5.9.3"
+  }
 }
