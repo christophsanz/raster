@@ -13,6 +13,14 @@
 		"raster",
 		"component"
 	],
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/christophsanz/raster.git"
+	},
+	"homepage": "https://github.com/christophsanz/raster#readme",
+	"bugs": {
+		"url": "https://github.com/christophsanz/raster/issues"
+	},
 	"files": [
 		"dist",
 		"!dist/**/*.test.*",
