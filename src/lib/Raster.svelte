@@ -3,6 +3,7 @@
 	import { quintOut } from 'svelte/easing';
 	import { crossfade } from 'svelte/transition';
 	import type { ColumnDef, SnippetArgs } from './types';
+	import { buildOffsets, uniformWindow, variableWindow } from './virtual';
 
 	type Props = {
 		rows: T[];
@@ -12,6 +13,27 @@
 		idKey: keyof T;
 		hasFooter?: boolean;
 		onRowClick?: (row: T, event: MouseEvent | KeyboardEvent) => void;
+		/**
+		 * Render only the rows visible in the viewport (plus `overscan` above and
+		 * below). Keeps the DOM small and scrolling smooth for large datasets.
+		 */
+		virtual?: boolean;
+		/**
+		 * Row height (px) used while virtualizing. Pass a number for a uniform
+		 * layout (fast path), or a function `(row, index) => number` for variable
+		 * heights — the grid builds a cumulative-offset table and binary-searches
+		 * it. Falls back to `minRowHeight`, then `DEFAULT_ROW_HEIGHT`. Ignored when
+		 * `virtual` is off.
+		 */
+		rowHeight?: number | ((row: T, index: number) => number);
+		/** Extra rows rendered above and below the viewport while virtualizing. */
+		overscan?: number;
+		/**
+		 * Height of the scroll container. A number is treated as `px`; a string is
+		 * used verbatim (e.g. `'60vh'`). When omitted, the grid keeps its default
+		 * `height: 100%` and fills whatever bounded-height parent contains it.
+		 */
+		containerHeight?: number | string;
 	};
 
 	let {
@@ -21,10 +43,100 @@
 		header: customHeader,
 		idKey,
 		hasFooter = false,
-		onRowClick
+		onRowClick,
+		virtual = false,
+		rowHeight,
+		overscan = 6,
+		containerHeight
 	}: Props = $props();
 
 	let wrapper: HTMLElement;
+
+	const DEFAULT_ROW_HEIGHT = 40;
+
+	// --- virtualization state ---------------------------------------------
+	let headerEl: HTMLElement | undefined = $state();
+	let scrollTop = $state(0);
+	let viewportHeight = $state(0);
+	let headerHeight = $state(0);
+
+	const cssHeight = $derived(
+		containerHeight === undefined
+			? undefined
+			: typeof containerHeight === 'number'
+				? `${containerHeight}px`
+				: containerHeight
+	);
+
+	// Uniform row height when `rowHeight` is a number (or unset); the variable
+	// path below takes over when it is a function.
+	const uniformRowHeight = $derived(
+		typeof rowHeight === 'number' ? rowHeight : (minRowHeight ?? DEFAULT_ROW_HEIGHT)
+	);
+
+	// Cumulative offsets for variable heights, rebuilt only when the row data or
+	// the size function changes — not on every scroll tick.
+	const offsets = $derived.by(() => {
+		if (!virtual || typeof rowHeight !== 'function') return null;
+		const sizeFn = rowHeight;
+		return buildOffsets(rows.map((row, index) => sizeFn(row, index)));
+	});
+
+	// Pixel height of a single row, used both for layout and the row's style.
+	function heightAt(index: number): number {
+		return offsets ? offsets[index + 1] - offsets[index] : uniformRowHeight;
+	}
+
+	// The visible window: which rows to render, plus the spacer padding that
+	// reserves the scroll height of the off-screen rows.
+	const win = $derived.by(() => {
+		const viewportSpan = Math.max(0, viewportHeight - headerHeight);
+		if (!virtual) {
+			return { startIndex: 0, endIndex: rows.length - 1, topPad: 0, bottomPad: 0 };
+		}
+		return offsets
+			? variableWindow({ offsets, scrollTop, viewportSpan, overscan })
+			: uniformWindow({ count: rows.length, rowHeight: uniformRowHeight, scrollTop, viewportSpan, overscan });
+	});
+
+	const topPad = $derived(win.topPad);
+	const bottomPad = $derived(win.bottomPad);
+
+	// Slot-based keying: the key is the row's POSITION inside the visible window
+	// (slot 0 = topmost rendered row), not its data index. As the user scrolls,
+	// the window shifts but the slot keys stay 0..N-1, so Svelte recycles the
+	// existing row nodes and just updates their data + height instead of
+	// unmounting the top row and mounting a fresh one at the bottom every tick.
+	const virtualItems = $derived.by(() => {
+		const items: { row: T; key: string; height: number }[] = [];
+		for (let index = win.startIndex; index <= win.endIndex; index += 1) {
+			items.push({ row: rows[index], key: `slot_${index - win.startIndex}`, height: heightAt(index) });
+		}
+		return items;
+	});
+
+	// Keep viewport height in sync with the scroll container's size.
+	$effect(() => {
+		if (!virtual || !wrapper) return;
+		const observer = new ResizeObserver(() => {
+			viewportHeight = wrapper.clientHeight;
+		});
+		observer.observe(wrapper);
+		viewportHeight = wrapper.clientHeight;
+		return () => observer.disconnect();
+	});
+
+	// Track the sticky header's height so the visible window accounts for the
+	// space it occludes at the top of the scroll container.
+	$effect(() => {
+		if (!virtual || !headerEl) return;
+		const observer = new ResizeObserver(() => {
+			headerHeight = headerEl!.offsetHeight;
+		});
+		observer.observe(headerEl);
+		headerHeight = headerEl.offsetHeight;
+		return () => observer.disconnect();
+	});
 
 	/**
 	 * Scroll the row with the given id (matched against `row[idKey]`) into view.
@@ -32,8 +144,22 @@
 	 */
 	export function scrollToRow(id: T[keyof T], options: ScrollIntoViewOptions = { block: 'nearest' }) {
 		const row = wrapper?.querySelector(`[data-row-id="${CSS.escape(String(id))}"]`);
-		row?.scrollIntoView(options);
-		return !!row;
+		if (row) {
+			row.scrollIntoView(options);
+			return true;
+		}
+		// In virtual mode the target row may not be in the DOM; compute its
+		// position from the fixed row height and scroll the container directly.
+		if (virtual && wrapper) {
+			const index = rows.findIndex((r) => r[idKey] === id);
+			if (index === -1) return false;
+			wrapper.scrollTo({
+				top: offsets ? offsets[index] : index * uniformRowHeight,
+				behavior: options.behavior ?? 'auto'
+			});
+			return true;
+		}
+		return false;
 	}
 
 	const DEFAULT_WIDTH = 150;
@@ -123,8 +249,68 @@
 	{value.cur}
 {/snippet}
 
-<div class="datagrid-wrapper" bind:this={wrapper}>
-	<div class="datagrid-row datagrid-header">
+{#snippet bodyRow(row: T, height?: number)}
+	<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+	<div
+		class={['datagrid-row', { clickable: onRowClick }]}
+		data-row-id={row[idKey]}
+		role={onRowClick ? 'button' : undefined}
+		tabindex={onRowClick ? 0 : undefined}
+		style={height !== undefined ? `height: ${height}px` : undefined}
+		onclick={onRowClick ? (event) => onRowClick(row, event) : undefined}
+		onkeydown={onRowClick
+			? (event) => {
+					if (event.key === 'Enter' || event.key === ' ') {
+						event.preventDefault();
+						onRowClick(row, event);
+					}
+				}
+			: undefined}
+	>
+		{#each columns as column (column)}
+			<div
+				class="datagrid-cell"
+				style={`width: ${column.width ?? DEFAULT_WIDTH}px; min-height: ${minRowHeight}px`}
+			>
+				{#if column.cellSnippet}
+					{@render column.cellSnippet?.({
+						row,
+						column,
+						value: {
+							get cur() {
+								return getRowValue(row, column.accessorKeys);
+							},
+							set cur(val) {
+								setRowValue(row, column.accessorKeys, val);
+							}
+						}
+					})}
+				{:else}
+					{@render defaultCell({
+						row,
+						column,
+						value: {
+							get cur() {
+								return getRowValue(row, column.accessorKeys);
+							},
+							set cur(val) {
+								setRowValue(row, column.accessorKeys, val);
+							}
+						}
+					})}
+				{/if}
+			</div>
+		{/each}
+	</div>
+{/snippet}
+
+<div
+	class="datagrid-wrapper"
+	bind:this={wrapper}
+	style={cssHeight ? `height: ${cssHeight}` : undefined}
+	onscroll={() => (scrollTop = wrapper.scrollTop)}
+>
+	<div class="datagrid-row datagrid-header" bind:this={headerEl}>
 		{#each columns as column (column)}
 			<div class="datagrid-cell" style={`width: ${column.width ?? DEFAULT_WIDTH}px`}>
 				{#if column.headerSnippet}
@@ -147,59 +333,21 @@
 		{/each}
 	</div>
 	<div class="datagrid-body">
-		{#each rows as row (row[idKey])}
-			<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-			<div
-				class={['datagrid-row', { clickable: onRowClick }]}
-				data-row-id={row[idKey]}
-				role={onRowClick ? 'button' : undefined}
-				tabindex={onRowClick ? 0 : undefined}
-				onclick={onRowClick ? (event) => onRowClick(row, event) : undefined}
-				onkeydown={onRowClick
-					? (event) => {
-							if (event.key === 'Enter' || event.key === ' ') {
-								event.preventDefault();
-								onRowClick(row, event);
-							}
-						}
-					: undefined}
-			>
-				{#each columns as column (column)}
-					<div
-						class="datagrid-cell"
-						style={`width: ${column.width ?? DEFAULT_WIDTH}px; min-height: ${minRowHeight}px`}
-					>
-						{#if column.cellSnippet}
-							{@render column.cellSnippet?.({
-								row,
-								column,
-								value: {
-									get cur() {
-										return getRowValue(row, column.accessorKeys);
-									},
-									set cur(val) {
-										setRowValue(row, column.accessorKeys, val);
-									}
-								}
-							})}
-						{:else}
-							{@render defaultCell({
-								row,
-								column,
-								value: {
-									get cur() {
-										return getRowValue(row, column.accessorKeys);
-									},
-									set cur(val) {
-										setRowValue(row, column.accessorKeys, val);
-									}
-								}
-							})}
-						{/if}
-					</div>
-				{/each}
-			</div>
-		{/each}
+		{#if virtual}
+			{#if topPad > 0}
+				<div class="datagrid-spacer" style={`height: ${topPad}px`}></div>
+			{/if}
+			{#each virtualItems as item (item.key)}
+				{@render bodyRow(item.row, item.height)}
+			{/each}
+			{#if bottomPad > 0}
+				<div class="datagrid-spacer" style={`height: ${bottomPad}px`}></div>
+			{/if}
+		{:else}
+			{#each rows as row (row[idKey])}
+				{@render bodyRow(row)}
+			{/each}
+		{/if}
 	</div>
 	{#if hasFooter}
 		<div class="datagrid-footer-wrapper">
@@ -246,6 +394,11 @@
 		overflow: auto;
 		height: 100%;
 		border-radius: var(--radius);
+		/* Virtualization adjusts the spacer heights above the viewport on every
+		   scroll tick. Browser scroll anchoring would try to compensate for that
+		   resize and fight the virtualizer, causing janky / lurching scroll, so
+		   opt the scroll container's subtree out of it. */
+		overflow-anchor: none;
 	}
 
 	.datagrid-header {
@@ -276,6 +429,11 @@
 		display: flex;
 		width: max-content;
 		min-width: 100%;
+	}
+
+	/* Virtualization spacers reserve the scroll height of off-screen rows. */
+	.datagrid-spacer {
+		flex-shrink: 0;
 	}
 
 	.datagrid-row.clickable {

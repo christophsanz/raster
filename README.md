@@ -51,6 +51,10 @@ bun add svelte-raster
 | `header`       | `Snippet<[{ header: string; column: ColumnDef<T> }]>`    | —       | Custom header renderer for all columns.      |
 | `hasFooter`    | `boolean`                                                 | `false` | Render a footer row.                         |
 | `onRowClick`   | `(row: T, event: MouseEvent \| KeyboardEvent) => void`   | —       | Called when a body row is clicked or activated via keyboard. |
+| `virtual`      | `boolean`                                                | `false` | Render only the rows in (and near) the viewport. See below.  |
+| `rowHeight`    | `number \| ((row: T, index: number) => number)`         | `minRowHeight ?? 40` | Row height (px) used while virtualizing — a number, or a function for variable heights. |
+| `overscan`     | `number`                                                 | `6`     | Extra rows rendered above/below the viewport while virtualizing. |
+| `containerHeight` | `number \| string`                                    | —       | Height of the scroll container (number → px). Omit to keep `height: 100%`. |
 
 ### Row clicks
 
@@ -59,6 +63,50 @@ Pass `onRowClick` to react to row activation. The callback receives the full row
 ```svelte
 <Raster {rows} {columns} idKey="id" onRowClick={(row) => console.log('clicked', row.id)} />
 ```
+
+### Virtualization
+
+For large datasets, set `virtual` to render only the rows in view (plus `overscan`
+rows above and below). Off-screen rows are replaced by spacer elements that
+preserve the scroll height, so the scrollbar behaves exactly as if every row were
+mounted.
+
+```svelte
+<Raster {rows} {columns} idKey="id" virtual rowHeight={40} containerHeight={600} />
+```
+
+The scroll container needs a bounded height. Pass `containerHeight` (a number is
+treated as px, a string is used verbatim, e.g. `'60vh'`), or omit it and give the
+grid's parent a height — the wrapper defaults to `height: 100%`.
+
+Rendered rows are keyed by their **slot** in the visible window rather than by
+`idKey`, so Svelte recycles the same row nodes as you scroll instead of
+unmounting and remounting on every tick.
+
+`scrollToRow` keeps working in virtual mode — if the target row isn't currently
+mounted, the grid scrolls to its computed offset instead.
+
+#### Variable row heights
+
+Pass a function to `rowHeight` to give each row its own height. The grid builds a
+cumulative-offset table (rebuilt only when `rows` or the function changes) and
+binary-searches it on each scroll, so it stays O(log n) per frame even for very
+large datasets.
+
+```svelte
+<Raster
+	{rows}
+	{columns}
+	idKey="id"
+	virtual
+	containerHeight="70vh"
+	rowHeight={(row) => (row.expanded ? 120 : 40)}
+/>
+```
+
+> The function should return the same height the row actually renders at — it
+> drives both layout and scroll positioning. It is not a measurement/estimate
+> that gets corrected after render.
 
 ### Per-column snippets
 
