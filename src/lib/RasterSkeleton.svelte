@@ -17,20 +17,20 @@
 	<div class="skeleton-cell"></div>
 {/snippet}
 
-<div class="datagrid-wrapper" in:fade>
+<div class="raster-wrapper" in:fade>
 	<div class="datagrid">
-		<div class="datagrid-row datagrid-header">
+		<div class="raster-row raster-header">
 			{#each columns as column (column)}
-				<div class="datagrid-cell" style={`width: ${column.width}px`}>
+				<div class="raster-cell" style={`width: ${column.width}px`}>
 					{@render skeletonCell()}
 				</div>
 			{/each}
 		</div>
-		<div class="datagrid-body">
+		<div class="raster-body">
 			{#each [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16] as _row, index (index)}
-				<div class="datagrid-row">
+				<div class="raster-row">
 					{#each columns as column (column)}
-						<div class="datagrid-cell" style={`width: ${column.width}px; height: ${50}px`}>
+						<div class="raster-cell" style={`width: ${column.width}px; height: ${50}px`}>
 							{@render skeletonCell()}
 						</div>
 					{/each}
@@ -64,7 +64,7 @@
 		}
 	}
 
-	.datagrid-wrapper {
+	.raster-wrapper {
 		position: relative;
 		display: flex;
 		flex-direction: row;
@@ -84,20 +84,20 @@
 		height: 100%;
 	}
 
-	.datagrid-body .datagrid-row {
+	.raster-body .raster-row {
 		border-bottom: 1px solid var(--e-border-color-muted);
 		font-weight: 400;
 		color: var(--e-text-color);
 		block-size: var(--e-table-row-height, 50px);
 	}
 
-	.datagrid-header {
+	.raster-header {
 		position: sticky;
 		top: 0;
 		background-color: var(--e-panel-background-color);
 	}
 
-	.datagrid-cell {
+	.raster-cell {
 		text-overflow: ellipsis;
 		overflow: hidden;
 		white-space: nowrap;
@@ -107,11 +107,11 @@
 		padding: var(--e-panel-padding);
 	}
 
-	.datagrid-header > .datagrid-cell {
+	.raster-header > .raster-cell {
 		position: relative;
 	}
 
-	.datagrid-row {
+	.raster-row {
 		display: flex;
 		align-items: center;
 	}

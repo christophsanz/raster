@@ -4,6 +4,7 @@
 	import { crossfade } from 'svelte/transition';
 	import type { ColumnDef, SnippetArgs } from './types';
 	import { buildOffsets, uniformWindow, variableWindow } from './virtual';
+	import { mergeProps } from './mergeProps';
 
 	type Props = {
 		rows: T[];
@@ -13,6 +14,19 @@
 		idKey: keyof T;
 		hasFooter?: boolean;
 		onRowClick?: (row: T, event: MouseEvent | KeyboardEvent) => void;
+		/**
+		 * Extra props spread onto each body `<div class="raster-row">`. The
+		 * return value is merged with the grid's own row props via `mergeProps`,
+		 * so `class`/`style` are combined (not clobbered), `on*` handlers are
+		 * chained alongside `onRowClick`, and Svelte attachments
+		 * (`{ [createAttachmentKey()]: attachment }`) pass straight through —
+		 * making this the single hook for per-row styling, event handlers, or
+		 * integrating a drag-and-drop library.
+		 *
+		 * Note: in `virtual` mode the underlying row nodes are recycled as you
+		 * scroll, which some stateful DnD libraries don't expect.
+		 */
+		rowProps?: (row: T, index: number) => Record<string | symbol, unknown>;
 		/**
 		 * Render only the rows visible in the viewport (plus `overscan` above and
 		 * below). Keeps the DOM small and scrolling smooth for large datasets.
@@ -44,6 +58,7 @@
 		idKey,
 		hasFooter = false,
 		onRowClick,
+		rowProps,
 		virtual = false,
 		rowHeight,
 		overscan = 6,
@@ -108,9 +123,14 @@
 	// existing row nodes and just updates their data + height instead of
 	// unmounting the top row and mounting a fresh one at the bottom every tick.
 	const virtualItems = $derived.by(() => {
-		const items: { row: T; key: string; height: number }[] = [];
+		const items: { row: T; index: number; key: string; height: number }[] = [];
 		for (let index = win.startIndex; index <= win.endIndex; index += 1) {
-			items.push({ row: rows[index], key: `slot_${index - win.startIndex}`, height: heightAt(index) });
+			items.push({
+				row: rows[index],
+				index,
+				key: `slot_${index - win.startIndex}`,
+				height: heightAt(index)
+			});
 		}
 		return items;
 	});
@@ -249,55 +269,51 @@
 	{value.cur}
 {/snippet}
 
-{#snippet bodyRow(row: T, height?: number)}
+{#snippet bodyRow(row: T, index: number, height?: number)}
 	<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 	<div
-		class={['datagrid-row', { clickable: onRowClick }]}
-		data-row-id={row[idKey]}
-		role={onRowClick ? 'button' : undefined}
-		tabindex={onRowClick ? 0 : undefined}
-		style={height !== undefined ? `height: ${height}px` : undefined}
-		onclick={onRowClick ? (event) => onRowClick(row, event) : undefined}
-		onkeydown={onRowClick
-			? (event) => {
-					if (event.key === 'Enter' || event.key === ' ') {
-						event.preventDefault();
-						onRowClick(row, event);
-					}
-				}
-			: undefined}
+		{...mergeProps(
+			{
+				class: ['raster-row', { clickable: onRowClick }],
+				'data-row-id': row[idKey],
+				role: onRowClick ? 'button' : undefined,
+				tabindex: onRowClick ? 0 : undefined,
+				style: height !== undefined ? `height: ${height}px` : undefined,
+				onclick: onRowClick ? (event: MouseEvent) => onRowClick(row, event) : undefined,
+				onkeydown: onRowClick
+					? (event: KeyboardEvent) => {
+							if (event.key === 'Enter' || event.key === ' ') {
+								event.preventDefault();
+								onRowClick(row, event);
+							}
+						}
+					: undefined
+			},
+			rowProps?.(row, index)
+		)}
 	>
 		{#each columns as column (column)}
+			{@const value = {
+				get cur() {
+					return getRowValue(row, column.accessorKeys);
+				},
+				set cur(val) {
+					setRowValue(row, column.accessorKeys, val);
+				}
+			}}
 			<div
-				class="datagrid-cell"
-				style={`width: ${column.width ?? DEFAULT_WIDTH}px; min-height: ${minRowHeight}px`}
+				{...mergeProps(
+					{
+						class: 'raster-cell',
+						style: `width: ${column.width ?? DEFAULT_WIDTH}px; min-height: ${minRowHeight}px`
+					},
+					column.cellProps?.({ row, column, value })
+				)}
 			>
 				{#if column.cellSnippet}
-					{@render column.cellSnippet?.({
-						row,
-						column,
-						value: {
-							get cur() {
-								return getRowValue(row, column.accessorKeys);
-							},
-							set cur(val) {
-								setRowValue(row, column.accessorKeys, val);
-							}
-						}
-					})}
+					{@render column.cellSnippet?.({ row, column, value })}
 				{:else}
-					{@render defaultCell({
-						row,
-						column,
-						value: {
-							get cur() {
-								return getRowValue(row, column.accessorKeys);
-							},
-							set cur(val) {
-								setRowValue(row, column.accessorKeys, val);
-							}
-						}
-					})}
+					{@render defaultCell({ row, column, value })}
 				{/if}
 			</div>
 		{/each}
@@ -305,14 +321,14 @@
 {/snippet}
 
 <div
-	class="datagrid-wrapper"
+	class="raster-wrapper"
 	bind:this={wrapper}
 	style={cssHeight ? `height: ${cssHeight}` : undefined}
 	onscroll={() => (scrollTop = wrapper.scrollTop)}
 >
-	<div class="datagrid-row datagrid-header" bind:this={headerEl}>
+	<div class="raster-row raster-header" bind:this={headerEl}>
 		{#each columns as column (column)}
-			<div class="datagrid-cell" style={`width: ${column.width ?? DEFAULT_WIDTH}px`}>
+			<div class="raster-cell" style={`width: ${column.width ?? DEFAULT_WIDTH}px`}>
 				{#if column.headerSnippet}
 					{@render column.headerSnippet?.({
 						row: rows[0],
@@ -332,29 +348,29 @@
 			</div>
 		{/each}
 	</div>
-	<div class="datagrid-body">
+	<div class="raster-body">
 		{#if virtual}
 			{#if topPad > 0}
-				<div class="datagrid-spacer" style={`height: ${topPad}px`}></div>
+				<div class="raster-spacer" style={`height: ${topPad}px`}></div>
 			{/if}
 			{#each virtualItems as item (item.key)}
-				{@render bodyRow(item.row, item.height)}
+				{@render bodyRow(item.row, item.index, item.height)}
 			{/each}
 			{#if bottomPad > 0}
-				<div class="datagrid-spacer" style={`height: ${bottomPad}px`}></div>
+				<div class="raster-spacer" style={`height: ${bottomPad}px`}></div>
 			{/if}
 		{:else}
-			{#each rows as row (row[idKey])}
-				{@render bodyRow(row)}
+			{#each rows as row, index (row[idKey])}
+				{@render bodyRow(row, index)}
 			{/each}
 		{/if}
 	</div>
 	{#if hasFooter}
-		<div class="datagrid-footer-wrapper">
-			<div class="datagrid-row datagrid-footer">
+		<div class="raster-footer-wrapper">
+			<div class="raster-row raster-footer">
 				{#each columns as column (column)}
 					<div
-						class="datagrid-cell"
+						class="raster-cell"
 						style={`width: ${column.width ?? DEFAULT_WIDTH}px;min-height: ${minRowHeight}px`}
 					>
 						{#if column.footerSnippet}
@@ -383,7 +399,7 @@
 		cursor: ew-resize;
 		z-index: 100;
 	}
-	.datagrid-wrapper {
+	.raster-wrapper {
 		position: relative;
 		display: flex;
 		flex-direction: column;
@@ -401,13 +417,13 @@
 		overflow-anchor: none;
 	}
 
-	.datagrid-header {
+	.raster-header {
 		position: sticky;
 		z-index: 1;
 		top: 0;
 	}
 
-	.datagrid-cell {
+	.raster-cell {
 		text-overflow: ellipsis;
 		overflow: hidden;
 		white-space: nowrap;
@@ -417,38 +433,38 @@
 		flex-shrink: 0;
 	}
 
-	.datagrid-cell:last-child {
+	.raster-cell:last-child {
 		flex-grow: 1;
 	}
 
-	.datagrid-header > .datagrid-cell {
+	.raster-header > .raster-cell {
 		position: relative;
 	}
 
-	.datagrid-row {
+	.raster-row {
 		display: flex;
 		width: max-content;
 		min-width: 100%;
 	}
 
 	/* Virtualization spacers reserve the scroll height of off-screen rows. */
-	.datagrid-spacer {
+	.raster-spacer {
 		flex-shrink: 0;
 	}
 
-	.datagrid-row.clickable {
+	.raster-row.clickable {
 		cursor: pointer;
 	}
 
-	.datagrid-footer {
+	.raster-footer {
 		opacity: 0.5;
-		.datagrid-cell:last-child :global(button) {
+		.raster-cell:last-child :global(button) {
 			display: none;
 		}
 		&:focus-within,
 		&:hover {
 			opacity: 1;
-			.datagrid-cell:last-child :global(button) {
+			.raster-cell:last-child :global(button) {
 				display: flex;
 			}
 		}

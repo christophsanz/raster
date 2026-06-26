@@ -51,6 +51,7 @@ bun add svelte-raster
 | `header`       | `Snippet<[{ header: string; column: ColumnDef<T> }]>`    | —       | Custom header renderer for all columns.      |
 | `hasFooter`    | `boolean`                                                 | `false` | Render a footer row.                         |
 | `onRowClick`   | `(row: T, event: MouseEvent \| KeyboardEvent) => void`   | —       | Called when a body row is clicked or activated via keyboard. |
+| `rowProps`     | `(row: T, index: number) => Record<string \| symbol, unknown>` | — | Extra props merged onto each body row element. See [Custom row & cell props](#custom-row--cell-props-drag--drop). |
 | `virtual`      | `boolean`                                                | `false` | Render only the rows in (and near) the viewport. See below.  |
 | `rowHeight`    | `number \| ((row: T, index: number) => number)`         | `minRowHeight ?? 40` | Row height (px) used while virtualizing — a number, or a function for variable heights. |
 | `overscan`     | `number`                                                 | `6`     | Extra rows rendered above/below the viewport while virtualizing. |
@@ -111,6 +112,86 @@ large datasets.
 ### Per-column snippets
 
 A `ColumnDef<T>` can define `headerSnippet`, `cellSnippet` and `footerSnippet` to fully control rendering. Each snippet receives `{ row, column, value }`, where `value.cur` is a getter/setter bound to the (possibly nested) `accessorKeys` path.
+
+### Custom row & cell props (drag & drop)
+
+Instead of a fixed set of drag/style props, the grid exposes two escape hatches that
+let you put **anything** onto the underlying elements:
+
+- `rowProps(row, index)` — props for each body row `<div>`.
+- a column's `cellProps({ row, column, value })` — props for that column's body cell `<div>`.
+
+Whatever you return is combined with the grid's own props via the exported
+[`mergeProps`](#mergeprops) helper, so you never clobber the grid's behavior:
+
+- `class` is concatenated (string, array or `{ name: truthy }` object).
+- `style` is concatenated.
+- `on*` handlers are **chained** — your `onclick` runs alongside `onRowClick`,
+  and a handler calling `event.preventDefault()` stops the rest of the chain.
+- everything else is last-wins (your value overrides the grid's).
+- **Svelte attachments pass straight through.** An attachment is just a prop
+  whose key is a `Symbol` (via `createAttachmentKey()`), so returning one wires
+  the attachment onto the row/cell node — the recommended way to integrate a
+  drag-and-drop library.
+
+```svelte
+<script lang="ts">
+	import { Raster, type ColumnDef } from 'svelte-raster';
+	import { createAttachmentKey } from 'svelte/attachments';
+
+	let draggingId = $state<number | null>(null);
+
+	// any DnD library that wants the DOM node works here (SortableJS,
+	// pragmatic-drag-and-drop, svelte-dnd-action, …). Native HTML5 shown below.
+	const columns: ColumnDef<Person>[] = [
+		{
+			header: 'Name',
+			accessorKeys: ['name'],
+			// per-cell props: right-align the age column, add a click handler, etc.
+			cellProps: ({ row }) => ({ class: { highlight: row.id === draggingId } })
+		}
+	];
+</script>
+
+<Raster
+	{rows}
+	{columns}
+	idKey="id"
+	rowProps={(row, index) => ({
+		draggable: true,
+		class: { dragging: row.id === draggingId },
+		ondragstart: (e: DragEvent) => {
+			draggingId = row.id;
+			e.dataTransfer?.setData('text/plain', String(index));
+		},
+		ondragend: () => (draggingId = null),
+		// hand the row node to a DnD library via an attachment:
+		[createAttachmentKey()]: (node: HTMLElement) => {
+			// e.g. registerSortable(node, index); return () => unregister(node);
+		}
+	})}
+/>
+```
+
+> In `virtual` mode the row nodes are **recycled** as you scroll (keyed by slot,
+> not by `idKey`), so the same DOM element is reused for different rows. Native
+> drag attributes and the chained handlers cope fine, but some stateful DnD
+> libraries assume stable nodes — test before relying on it with virtualization on.
+
+#### `mergeProps`
+
+The same helper is exported for use inside your own snippets, when you need to
+merge caller-provided props with your own onto an element:
+
+```ts
+import { mergeProps } from 'svelte-raster';
+
+const props = mergeProps(
+	{ class: 'base', onclick: () => console.log('first') },
+	{ class: 'extra', onclick: () => console.log('second') }
+);
+// → { class: 'base extra', onclick: <both, in order> }
+```
 
 ### Imperative methods
 
