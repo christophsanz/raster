@@ -20,6 +20,25 @@ export type ColumnDef<T> = {
 	 * Handy for per-cell styling, event handlers, or wiring a drag-and-drop lib.
 	 */
 	cellProps?: (args: SnippetArgs<T>) => Record<string | symbol, unknown>;
+	/**
+	 * Extra props spread onto this column's header `<div class="raster-cell">`.
+	 * Header cells aren't bound to a row value, so this receives the same static
+	 * args as `headerSnippet` ({@link StaticSnippetArgs} — `value` is always `{}`).
+	 * Merged with the grid's own header-cell props via {@link mergeProps}, so
+	 * `class`/`style` combine (not clobber), `on*` handlers chain, and Svelte
+	 * attachments pass straight through — the header-cell counterpart to
+	 * `cellProps`. Handy for styling a header, wiring a sort/menu handler, or
+	 * making a column flex-grow in the header and body in lockstep.
+	 */
+	headerProps?: (args: StaticSnippetArgs<T>) => Record<string | symbol, unknown>;
+	/**
+	 * Extra props spread onto this column's footer `<div class="raster-cell">`.
+	 * Like {@link headerProps}, it receives the same static args as `footerSnippet`
+	 * ({@link StaticSnippetArgs} — `value` is always `{}`) and is merged with the
+	 * grid's own footer-cell props via {@link mergeProps} — the footer-cell
+	 * counterpart to `cellProps`.
+	 */
+	footerProps?: (args: StaticSnippetArgs<T>) => Record<string | symbol, unknown>;
 };
 
 export type SnippetArgs<T> = {

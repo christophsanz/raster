@@ -328,7 +328,12 @@
 >
 	<div class="raster-row raster-header" bind:this={headerEl}>
 		{#each columns as column (column)}
-			<div class="raster-cell" style={`width: ${column.width ?? DEFAULT_WIDTH}px`}>
+			<div
+				{...mergeProps(
+					{ class: 'raster-cell', style: `width: ${column.width ?? DEFAULT_WIDTH}px` },
+					column.headerProps?.({ row: rows[0], column, value: {} })
+				)}
+			>
 				{#if column.headerSnippet}
 					{@render column.headerSnippet?.({
 						row: rows[0],
@@ -370,8 +375,13 @@
 			<div class="raster-row raster-footer">
 				{#each columns as column (column)}
 					<div
-						class="raster-cell"
-						style={`width: ${column.width ?? DEFAULT_WIDTH}px;min-height: ${minRowHeight}px`}
+						{...mergeProps(
+							{
+								class: 'raster-cell',
+								style: `width: ${column.width ?? DEFAULT_WIDTH}px;min-height: ${minRowHeight}px`
+							},
+							column.footerProps?.({ row: rows[0], column, value: {} })
+						)}
 					>
 						{#if column.footerSnippet}
 							{@render column.footerSnippet?.({

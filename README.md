@@ -120,6 +120,25 @@ let you put **anything** onto the underlying elements:
 
 - `rowProps(row, index)` — props for each body row `<div>`.
 - a column's `cellProps({ row, column, value })` — props for that column's body cell `<div>`.
+- a column's `headerProps({ row, column, value })` — props for that column's header cell `<div>`.
+- a column's `footerProps({ row, column, value })` — props for that column's footer cell `<div>`.
+
+`headerProps` and `footerProps` are the header/footer-cell counterparts to `cellProps`.
+Header and footer cells aren't bound to a row value, so they receive the same static
+args as `headerSnippet` / `footerSnippet` (`value` is always `{}`). A common use is
+keeping a filling column aligned by making it `flex-grow` in the header **and** body
+in lockstep:
+
+```ts
+const columns: ColumnDef<Person>[] = [
+	{
+		header: 'Name',
+		accessorKeys: ['name'],
+		headerProps: () => ({ style: 'flex-grow: 1' }),
+		cellProps: () => ({ style: 'flex-grow: 1' })
+	}
+];
+```
 
 Whatever you return is combined with the grid's own props via the exported
 [`mergeProps`](#mergeprops) helper, so you never clobber the grid's behavior:
