@@ -5,8 +5,11 @@ name: Create release
 # tags the bump commit, publishes to the npm registry, and creates the GitHub
 # release — all in one run.
 #
-# Requires an NPM_TOKEN repository secret (an npm automation/granular token with
-# publish rights to `svelte-raster`).
+# Publishing uses npm Trusted Publishing (OIDC): GitHub mints a short-lived
+# identity token at run time, so there is NO long-lived NPM_TOKEN secret to store.
+# One-time setup on npmjs.com → svelte-raster → Settings → Trusted Publishing:
+# add a GitHub Actions publisher for christophsanz/raster with workflow file
+# `release.yml`. (Needs npm CLI >= 11.5.1, which is installed below.)
 #
 # Note: the default GITHUB_TOKEN must be allowed to push to the release branch. If
 # the branch is protected against the actions bot, switch to a GitHub App token.
@@ -45,6 +48,7 @@ on:
 
 permissions:
   contents: write # push the bump commit + tag, create the release
+  id-token: write # mint the OIDC token for npm Trusted Publishing
 
 concurrency:
   group: release
@@ -73,6 +77,10 @@ jobs:
         with:
           node-version: '22'
           registry-url: 'https://registry.npmjs.org'
+
+      # Trusted Publishing (OIDC) needs npm >= 11.5.1; Node 22 ships npm 10.x.
+      - name: Upgrade npm for OIDC publishing
+        run: npm install -g npm@latest
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -115,11 +123,11 @@ jobs:
           git push origin "HEAD:${{ github.ref_name }}"
           git push origin "${{ steps.bump.outputs.tag }}"
 
-      - name: Publish to npm
+      # No stored token: npm exchanges the GitHub OIDC identity for a
+      # short-lived publish token and attaches build provenance automatically.
+      - name: Publish to npm (Trusted Publishing)
         if: github.event.inputs.dry_run != 'true'
         run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create GitHub release
         if: github.event.inputs.dry_run != 'true'
