@@ -14,7 +14,13 @@ export type VirtualWindow = {
 	totalSize: number;
 };
 
-const EMPTY: VirtualWindow = { startIndex: 0, endIndex: -1, topPad: 0, bottomPad: 0, totalSize: 0 };
+const EMPTY: VirtualWindow = {
+	startIndex: 0,
+	endIndex: -1,
+	topPad: 0,
+	bottomPad: 0,
+	totalSize: 0
+};
 
 function clamp(value: number, min: number, max: number): number {
 	return Math.min(Math.max(value, min), max);

@@ -1,0 +1,12 @@
+# Package managers
+package-lock.json
+package.json
+pnpm-lock.yaml
+yarn.lock
+bun.lock
+bun.lockb
+
+# Build output (also covered by .gitignore via ESLint, listed here for Prettier)
+/dist
+/build
+/.svelte-kit

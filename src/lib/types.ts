@@ -39,7 +39,9 @@ export type ColumnDef<T> = {
 	 * `cellProps`. Handy for styling a header, wiring a sort/menu handler, or
 	 * making a column flex-grow in the header and body in lockstep.
 	 */
-	headerProps?: (args: StaticSnippetArgs<T>) => Record<string | symbol, unknown>;
+	headerProps?: (
+		args: StaticSnippetArgs<T>
+	) => Record<string | symbol, unknown>;
 	/**
 	 * Extra props spread onto this column's footer `<div class="raster-cell">`.
 	 * Like {@link headerProps}, it receives the same static args as `footerSnippet`
@@ -47,7 +49,9 @@ export type ColumnDef<T> = {
 	 * grid's own footer-cell props via {@link mergeProps} — the footer-cell
 	 * counterpart to `cellProps`.
 	 */
-	footerProps?: (args: StaticSnippetArgs<T>) => Record<string | symbol, unknown>;
+	footerProps?: (
+		args: StaticSnippetArgs<T>
+	) => Record<string | symbol, unknown>;
 };
 
 export type SnippetArgs<T> = {

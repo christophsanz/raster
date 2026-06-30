@@ -23,7 +23,9 @@ const isEventHandler = (key: string | symbol): key is string =>
 // The return type intentionally omits the `symbol` index signature: attachments
 // (symbol-keyed) are still copied at runtime, but declaring them here would make
 // the result incompatible with Svelte's element-props type when spread.
-export function mergeProps(...sources: (MergeableProps | undefined | null)[]): Record<string, unknown> {
+export function mergeProps(
+	...sources: (MergeableProps | undefined | null)[]
+): Record<string, unknown> {
 	const result: MergeableProps = {};
 	const handlers: Record<string, Array<(event: Event) => void>> = {};
 
@@ -53,13 +55,15 @@ export function mergeProps(...sources: (MergeableProps | undefined | null)[]): R
 	if (classes.length) result.class = clsx(classes);
 
 	const styles = sources.map((s) => s?.style).filter((s) => s != null);
-	if (styles.length) result.style = styles.map(toStyleString).filter(Boolean).join('; ');
+	if (styles.length)
+		result.style = styles.map(toStyleString).filter(Boolean).join('; ');
 
 	return result as Record<string, unknown>;
 }
 
 function clsx(value: unknown): string {
-	if (typeof value === 'string' || typeof value === 'number') return String(value);
+	if (typeof value === 'string' || typeof value === 'number')
+		return String(value);
 	if (Array.isArray(value)) return value.map(clsx).filter(Boolean).join(' ');
 	if (typeof value === 'object' && value !== null) {
 		return Object.keys(value)

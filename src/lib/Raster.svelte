@@ -86,7 +86,9 @@
 	// Uniform row height when `rowHeight` is a number (or unset); the variable
 	// path below takes over when it is a function.
 	const uniformRowHeight = $derived(
-		typeof rowHeight === 'number' ? rowHeight : (minRowHeight ?? DEFAULT_ROW_HEIGHT)
+		typeof rowHeight === 'number'
+			? rowHeight
+			: (minRowHeight ?? DEFAULT_ROW_HEIGHT)
 	);
 
 	// Cumulative offsets for variable heights, rebuilt only when the row data or
@@ -107,11 +109,22 @@
 	const win = $derived.by(() => {
 		const viewportSpan = Math.max(0, viewportHeight - headerHeight);
 		if (!virtual) {
-			return { startIndex: 0, endIndex: rows.length - 1, topPad: 0, bottomPad: 0 };
+			return {
+				startIndex: 0,
+				endIndex: rows.length - 1,
+				topPad: 0,
+				bottomPad: 0
+			};
 		}
 		return offsets
 			? variableWindow({ offsets, scrollTop, viewportSpan, overscan })
-			: uniformWindow({ count: rows.length, rowHeight: uniformRowHeight, scrollTop, viewportSpan, overscan });
+			: uniformWindow({
+					count: rows.length,
+					rowHeight: uniformRowHeight,
+					scrollTop,
+					viewportSpan,
+					overscan
+				});
 	});
 
 	const topPad = $derived(win.topPad);
@@ -162,8 +175,13 @@
 	 * Scroll the row with the given id (matched against `row[idKey]`) into view.
 	 * Call via a component reference, e.g. `raster.scrollToRow(id)`.
 	 */
-	export function scrollToRow(id: T[keyof T], options: ScrollIntoViewOptions = { block: 'nearest' }) {
-		const row = wrapper?.querySelector(`[data-row-id="${CSS.escape(String(id))}"]`);
+	export function scrollToRow(
+		id: T[keyof T],
+		options: ScrollIntoViewOptions = { block: 'nearest' }
+	) {
+		const row = wrapper?.querySelector(
+			`[data-row-id="${CSS.escape(String(id))}"]`
+		);
 		if (row) {
 			row.scrollIntoView(options);
 			return true;
@@ -241,10 +259,17 @@
 		}, row);
 	};
 
-	const setRowValue = (row: T, accessorKeys: PropertyKey[] = [], value: unknown): void => {
+	const setRowValue = (
+		row: T,
+		accessorKeys: PropertyKey[] = [],
+		value: unknown
+	): void => {
 		if (accessorKeys.length === 0) return;
 
-		let currentObj: Record<PropertyKey, unknown> = row as Record<PropertyKey, unknown>;
+		let currentObj: Record<PropertyKey, unknown> = row as Record<
+			PropertyKey,
+			unknown
+		>;
 
 		const pathKeys = accessorKeys.slice(0, -1);
 		const finalKey = accessorKeys.at(-1)!;
@@ -270,7 +295,6 @@
 {/snippet}
 
 {#snippet bodyRow(row: T, index: number, height?: number)}
-	<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 	<div
 		{...mergeProps(
 			{
@@ -279,7 +303,9 @@
 				role: onRowClick ? 'button' : undefined,
 				tabindex: onRowClick ? 0 : undefined,
 				style: height !== undefined ? `height: ${height}px` : undefined,
-				onclick: onRowClick ? (event: MouseEvent) => onRowClick(row, event) : undefined,
+				onclick: onRowClick
+					? (event: MouseEvent) => onRowClick(row, event)
+					: undefined,
 				onkeydown: onRowClick
 					? (event: KeyboardEvent) => {
 							if (event.key === 'Enter' || event.key === ' ') {
@@ -330,7 +356,10 @@
 		{#each columns as column (column.id ?? column)}
 			<div
 				{...mergeProps(
-					{ class: 'raster-cell', style: `width: ${column.width ?? DEFAULT_WIDTH}px` },
+					{
+						class: 'raster-cell',
+						style: `width: ${column.width ?? DEFAULT_WIDTH}px`
+					},
 					column.headerProps?.({ row: rows[0], column, value: {} })
 				)}
 			>

@@ -30,7 +30,10 @@
 			{#each [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16] as _row, index (index)}
 				<div class="raster-row">
 					{#each columns as column (column)}
-						<div class="raster-cell" style={`width: ${column.width}px; height: ${50}px`}>
+						<div
+							class="raster-cell"
+							style={`width: ${column.width}px; height: ${50}px`}
+						>
 							{@render skeletonCell()}
 						</div>
 					{/each}

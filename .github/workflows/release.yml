@@ -1,0 +1,148 @@
+name: Create release
+
+# Cut a release from the GitHub UI (Actions → Create release → Run workflow).
+# The workflow bumps package.json, generates release notes from the commit log,
+# tags the bump commit, publishes to the npm registry, and creates the GitHub
+# release — all in one run.
+#
+# Requires an NPM_TOKEN repository secret (an npm automation/granular token with
+# publish rights to `svelte-raster`).
+#
+# Note: the default GITHUB_TOKEN must be allowed to push to the release branch. If
+# the branch is protected against the actions bot, switch to a GitHub App token.
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Version bump (npm semantics)'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+          - prepatch
+          - preminor
+          - premajor
+          - prerelease
+      preid:
+        description: 'Prerelease identifier (only applied to pre* bumps)'
+        required: true
+        default: 'none'
+        type: choice
+        options:
+          - none
+          - alpha
+          - beta
+          - rc
+          - dev
+      dry_run:
+        description: 'Run bump + build, but do NOT tag, publish, or create the release.'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write # push the bump commit + tag, create the release
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  # Force JS actions onto Node 24 even when they declare Node 20.
+  # https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0 # full history + tags so the changelog can diff from the last release
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Configure git
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+      # Bump package.json only (bun.lock does not embed the root version). The
+      # commit + tag are created later so the changelog can diff feature commits
+      # against the previous tag without the release commit getting in the way.
+      - name: Bump version
+        id: bump
+        run: |
+          OLD_VERSION=$(node -p "require('./package.json').version")
+          BUMP='${{ github.event.inputs.bump }}'
+          PREID='${{ github.event.inputs.preid }}'
+          ARGS="$BUMP"
+          if [ "$PREID" != "none" ] && [ "${BUMP#pre}" != "$BUMP" ]; then
+            ARGS="$BUMP --preid=$PREID"
+          fi
+          NEW_VERSION=$(npm version $ARGS --no-git-tag-version | sed 's/^v//')
+          echo "old_version=$OLD_VERSION" >> "$GITHUB_OUTPUT"
+          echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+          # Tags are unprefixed — the tag IS the package.json version, no transform.
+          echo "tag=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Bumped $OLD_VERSION -> $NEW_VERSION"
+
+      # Build dist/ + publint against the bumped version before we publish.
+      - name: Build package
+        run: bun run package
+
+      - name: Commit, tag and push
+        if: github.event.inputs.dry_run != 'true'
+        run: |
+          git add package.json
+          git commit -m "release: ${{ steps.bump.outputs.tag }}"
+          git tag "${{ steps.bump.outputs.tag }}"
+          git push origin "HEAD:${{ github.ref_name }}"
+          git push origin "${{ steps.bump.outputs.tag }}"
+
+      - name: Publish to npm
+        if: github.event.inputs.dry_run != 'true'
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub release
+        if: github.event.inputs.dry_run != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.bump.outputs.tag }}
+        run: |
+          ARGS=(--title "$TAG" --generate-notes)
+          if [ '${{ github.event.inputs.preid }}' != 'none' ]; then ARGS+=(--prerelease); fi
+          gh release create "$TAG" "${ARGS[@]}"
+
+      - name: Release summary
+        if: always()
+        env:
+          VERSION: ${{ steps.bump.outputs.new_version }}
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+        run: |
+          {
+            echo "### Release summary"
+            if [ "$DRY_RUN" = "true" ]; then
+              echo "**DRY RUN** — no tag, publish, or release was created."
+            fi
+            echo "Version: $VERSION"
+            echo
+            echo "_Release notes are GitHub's auto-generated notes from the commit log._"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -42,27 +42,32 @@ bun add svelte-raster
 
 ### Props
 
-| Prop           | Type                                                      | Default | Description                                  |
-| -------------- | -------------------------------------------------------- | ------- | -------------------------------------------- |
-| `rows`         | `T[]`                                                     | —       | The data rows to render.                     |
-| `columns`      | `ColumnDef<T>[]`                                          | —       | Column definitions.                          |
-| `idKey`        | `keyof T`                                                 | —       | Key used to uniquely identify each row.      |
-| `minRowHeight` | `number`                                                  | —       | Minimum height (px) of body cells.           |
-| `header`       | `Snippet<[{ header: string; column: ColumnDef<T> }]>`    | —       | Custom header renderer for all columns.      |
-| `hasFooter`    | `boolean`                                                 | `false` | Render a footer row.                         |
-| `onRowClick`   | `(row: T, event: MouseEvent \| KeyboardEvent) => void`   | —       | Called when a body row is clicked or activated via keyboard. |
-| `rowProps`     | `(row: T, index: number) => Record<string \| symbol, unknown>` | — | Extra props merged onto each body row element. See [Custom row & cell props](#custom-row--cell-props-drag--drop). |
-| `virtual`      | `boolean`                                                | `false` | Render only the rows in (and near) the viewport. See below.  |
-| `rowHeight`    | `number \| ((row: T, index: number) => number)`         | `minRowHeight ?? 40` | Row height (px) used while virtualizing — a number, or a function for variable heights. |
-| `overscan`     | `number`                                                 | `6`     | Extra rows rendered above/below the viewport while virtualizing. |
-| `containerHeight` | `number \| string`                                    | —       | Height of the scroll container (number → px). Omit to keep `height: 100%`. |
+| Prop              | Type                                                           | Default              | Description                                                                                                       |
+| ----------------- | -------------------------------------------------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `rows`            | `T[]`                                                          | —                    | The data rows to render.                                                                                          |
+| `columns`         | `ColumnDef<T>[]`                                               | —                    | Column definitions.                                                                                               |
+| `idKey`           | `keyof T`                                                      | —                    | Key used to uniquely identify each row.                                                                           |
+| `minRowHeight`    | `number`                                                       | —                    | Minimum height (px) of body cells.                                                                                |
+| `header`          | `Snippet<[{ header: string; column: ColumnDef<T> }]>`          | —                    | Custom header renderer for all columns.                                                                           |
+| `hasFooter`       | `boolean`                                                      | `false`              | Render a footer row.                                                                                              |
+| `onRowClick`      | `(row: T, event: MouseEvent \| KeyboardEvent) => void`         | —                    | Called when a body row is clicked or activated via keyboard.                                                      |
+| `rowProps`        | `(row: T, index: number) => Record<string \| symbol, unknown>` | —                    | Extra props merged onto each body row element. See [Custom row & cell props](#custom-row--cell-props-drag--drop). |
+| `virtual`         | `boolean`                                                      | `false`              | Render only the rows in (and near) the viewport. See below.                                                       |
+| `rowHeight`       | `number \| ((row: T, index: number) => number)`                | `minRowHeight ?? 40` | Row height (px) used while virtualizing — a number, or a function for variable heights.                           |
+| `overscan`        | `number`                                                       | `6`                  | Extra rows rendered above/below the viewport while virtualizing.                                                  |
+| `containerHeight` | `number \| string`                                             | —                    | Height of the scroll container (number → px). Omit to keep `height: 100%`.                                        |
 
 ### Row clicks
 
 Pass `onRowClick` to react to row activation. The callback receives the full row object (including its `idKey` value) and the originating event. When set, rows become keyboard-focusable (`Enter` / `Space` also trigger it) and show a pointer cursor.
 
 ```svelte
-<Raster {rows} {columns} idKey="id" onRowClick={(row) => console.log('clicked', row.id)} />
+<Raster
+	{rows}
+	{columns}
+	idKey="id"
+	onRowClick={(row) => console.log('clicked', row.id)}
+/>
 ```
 
 ### Virtualization
@@ -73,7 +78,14 @@ preserve the scroll height, so the scrollbar behaves exactly as if every row wer
 mounted.
 
 ```svelte
-<Raster {rows} {columns} idKey="id" virtual rowHeight={40} containerHeight={600} />
+<Raster
+	{rows}
+	{columns}
+	idKey="id"
+	virtual
+	rowHeight={40}
+	containerHeight={600}
+/>
 ```
 
 The scroll container needs a bounded height. Pass `containerHeight` (a number is
@@ -216,9 +228,9 @@ const props = mergeProps(
 
 Grab a component reference with `bind:this` to call methods on the grid.
 
-| Method                       | Returns   | Description                                                            |
-| ---------------------------- | --------- | -------------------------------------------------------------------- |
-| `scrollToRow(id, options?)`  | `boolean` | Scroll the row whose `idKey` value equals `id` into view. Returns `true` if found. |
+| Method                      | Returns   | Description                                                                        |
+| --------------------------- | --------- | ---------------------------------------------------------------------------------- |
+| `scrollToRow(id, options?)` | `boolean` | Scroll the row whose `idKey` value equals `id` into view. Returns `true` if found. |
 
 `options` is a standard [`ScrollIntoViewOptions`](https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollIntoView) object and defaults to `{ block: 'nearest' }`.
 
@@ -256,14 +268,14 @@ Grab a component reference with `bind:this` to call methods on the grid.
 
 The component is unstyled beyond layout and reads a few CSS custom properties from the surrounding context. Define these on a parent element (or `:root`) to theme it:
 
-| Variable                      | Used by            | Purpose                          |
-| ----------------------------- | ------------------ | -------------------------------- |
-| `--radius`                    | both               | Border radius.                   |
-| `--e-border-color-muted`      | skeleton           | Row separator color.             |
-| `--e-text-color`              | skeleton           | Body text color.                 |
-| `--e-panel-background-color`  | skeleton           | Sticky header background.        |
-| `--e-panel-padding`           | skeleton           | Cell padding.                    |
-| `--e-table-row-height`        | skeleton           | Row height (falls back to 50px). |
+| Variable                     | Used by  | Purpose                          |
+| ---------------------------- | -------- | -------------------------------- |
+| `--radius`                   | both     | Border radius.                   |
+| `--e-border-color-muted`     | skeleton | Row separator color.             |
+| `--e-text-color`             | skeleton | Body text color.                 |
+| `--e-panel-background-color` | skeleton | Sticky header background.        |
+| `--e-panel-padding`          | skeleton | Cell padding.                    |
+| `--e-table-row-height`       | skeleton | Row height (falls back to 50px). |
 
 ## License
 
