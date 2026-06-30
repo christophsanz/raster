@@ -292,7 +292,7 @@
 			rowProps?.(row, index)
 		)}
 	>
-		{#each columns as column (column)}
+		{#each columns as column (column.id ?? column)}
 			{@const value = {
 				get cur() {
 					return getRowValue(row, column.accessorKeys);
@@ -327,7 +327,7 @@
 	onscroll={() => (scrollTop = wrapper.scrollTop)}
 >
 	<div class="raster-row raster-header" bind:this={headerEl}>
-		{#each columns as column (column)}
+		{#each columns as column (column.id ?? column)}
 			<div
 				{...mergeProps(
 					{ class: 'raster-cell', style: `width: ${column.width ?? DEFAULT_WIDTH}px` },
@@ -373,7 +373,7 @@
 	{#if hasFooter}
 		<div class="raster-footer-wrapper">
 			<div class="raster-row raster-footer">
-				{#each columns as column (column)}
+				{#each columns as column (column.id ?? column)}
 					<div
 						{...mergeProps(
 							{

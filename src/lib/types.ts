@@ -1,6 +1,15 @@
 import type { Snippet } from 'svelte';
 
 export type ColumnDef<T> = {
+	/**
+	 * Stable identity for this column, used as the `{#each}` key when rendering
+	 * columns. Set this when your `columns` array is derived/recreated on the
+	 * outside (e.g. a `$derived`) so Svelte keys columns by `id` instead of by
+	 * object reference — otherwise every recompute produces fresh column objects
+	 * and Svelte tears down and rebuilds the column DOM (losing focus, resize
+	 * state, etc.). Falls back to the object reference when omitted.
+	 */
+	id?: string;
 	header: string;
 	headerSnippet?: Snippet<[StaticSnippetArgs<T>]>;
 	cellSnippet?: Snippet<[SnippetArgs<T>]>;
