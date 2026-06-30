@@ -1,6 +1,6 @@
 {
   "name": "svelte-raster",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "A lightweight, resizable data-grid (raster) component for Svelte 5.",
   "license": "MIT",
   "type": "module",
